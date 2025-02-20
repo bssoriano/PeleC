@@ -39,12 +39,58 @@ struct TaggingParm
   int max_ftracerr_lev = 10;
   int max_ftracgrad_lev = 10;
   int max_vfracerr_lev = 10;
+
+
+  amrex::Real dom_lbnd_x = 1.0e10;
+  amrex::Real dom_hbnd_x = 1.0e10;
+  amrex::Real dom_lbnd_y = 1.0e10;
+  amrex::Real dom_hbnd_y = 1.0e10;
+  amrex::Real dom_lbnd_z = 1.0e10;
+  amrex::Real dom_hbnd_z = 1.0e10;
+  int max_dom_bnd_lev = 10;
+
   int max_eb_refine_lev = 10;
   int min_eb_refine_lev = -1;
   int adapt_eb_refined_lev = -1;
 
   amrex::Vector<amrex::AMRErrorTag> err_tags;
 };
+
+AMREX_GPU_DEVICE
+AMREX_FORCE_INLINE
+void
+tag_error_region(
+  const int i,
+  const int j,
+  const int k,
+  amrex::GeometryData const& geomdata,
+  amrex::Real x_lo,
+  amrex::Real x_hi,
+  amrex::Real y_lo,
+  amrex::Real y_hi,
+  amrex::Real z_lo,
+  amrex::Real z_hi,
+  amrex::Array4<char> const& tag,
+  char tagval) noexcept
+{
+  const amrex::Real* prob_lo = geomdata.ProbLo();
+  // const amrex::Real* prob_hi = geomdata.ProbHi();
+  const amrex::Real* dx = geomdata.CellSize();
+  const amrex::Real x = prob_lo[0] + (i + 0.5) * dx[0];
+  const amrex::Real y = prob_lo[1] + (j + 0.5) * dx[1];
+  const amrex::Real z = prob_lo[2] + (k + 0.5) * dx[2];
+
+
+  // Tag on regions of high field values
+  if ((x_lo < x) && (x < x_hi) && (y_lo < y) && (y < y_hi)
+#if AMREX_SPACEDIM == 3
+      && (z_lo < z) && (z < z_hi)
+  //    (dom_lbnd[2] < z) && (z < dom_hbnd[2])) {
+#endif
+     ){
+        tag(i, j, k) = tagval;
+  }
+}
 
 AMREX_GPU_DEVICE
 AMREX_FORCE_INLINE

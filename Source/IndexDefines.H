@@ -51,7 +51,7 @@
 #define QTHERM 8
 
 #ifndef NUM_ADV
-#define NUM_ADV 0
+#define NUM_ADV 1
 #endif
 #ifndef NUM_AUX
 #define NUM_AUX 0

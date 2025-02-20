@@ -161,6 +161,7 @@ pc_bcfill_hyp(
   const int scomp)
 {
 
+
   if (PeleC::turb_inflow.is_initialized()) {
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
       auto bndryBoxLO = amrex::Box(amrex::adjCellLo(geom.Domain(), dir) & bx);
@@ -199,6 +200,27 @@ pc_bcfill_hyp(
   amrex::GpuBndryFuncFab<PCHypFillExtDir> hyp_bndry_func(
     PCHypFillExtDir{lprobparm, PeleC::turb_inflow.is_initialized()});
   hyp_bndry_func(bx, data, dcomp, numcomp, geom, time, bcr, bcomp, scomp);
+
+  // if (PeleC::turb_inflow.is_initialized()) {
+
+  //   // Copy problem parameter structs to host
+  //   amrex::Gpu::copy(amrex::Gpu::deviceToHost, probparmDD, probparmDD + 1, probparmDH);
+
+  //   for (int dir=0; dir<dim; ++dir) {
+  //     if (probparmDH->turb_ok[dir]) {
+  //       // probparmH->turbfab[dir].clear();
+  //       probparmDH->turb_ok[dir] = false;
+  //     }
+  //     if (probparmDH->turb_ok[dir+dim]) {
+  //       // probparmH->turbfab[dir+dim].clear();
+  //       probparmDH->turb_ok[dir+dim] = false;
+  //     }
+  //   }
+
+  //   // Copy problem parameter structs back to device
+  //   amrex::Gpu::copy(amrex::Gpu::hostToDevice, probparmDH, probparmDH + 1, probparmDD);
+    
+  // }
 }
 
 void
