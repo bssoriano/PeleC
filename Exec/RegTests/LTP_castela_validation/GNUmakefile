@@ -14,7 +14,7 @@ USE_GPROF = FALSE
 # Performance
 USE_MPI =  TRUE
 USE_OMP = FALSE
-USE_CUDA = TRUE
+USE_CUDA = FALSE
 USE_HIP = FALSE
 USE_DPCPP = FALSE
 
@@ -25,7 +25,9 @@ THREAD_SANITIZER = FALSE
 
 # PeleC
 USE_TURBINFLOW = FALSE
-USE_FORCING = TRUE
+USE_FORCING = FALSE
+PELE_USE_MAGMA = FALSE
+PELE_COMPILE_AJACOBIAN = FALSE
 USE_MASA = FALSE
 Eos_Model := Fuego
 Chemistry_Model := LiDryer
@@ -34,8 +36,9 @@ Transport_Model := Simple
 # GNU Make
 Bpack := ./Make.package
 Blocs := .
-PELEC_HOME := ../../..
-include $(PELEC_HOME)/Exec/Make.PeleC
+PELE_HOME := /home/bsouzas/my_LMeX/PeleC
+PELE_PHYSICS_HOME := /home/bsouzas/my_LMeX/PelePhysics
+include $(PELE_HOME)/Exec/Make.PeleC
 
 ifeq ($(USE_GPU),TRUE)
   DEFINES += -DAMREX_GPUS_PER_NODE=2

@@ -13,8 +13,8 @@
 #include "PeleC.H"
 #include "IndexDefines.H"
 #include "PelePhysics.H"
+#include "ProblemSpecificFunctions.H"
 #include "Tagging.H"
-#include "ProblemDerive.H"
 #include "prob_parm.H"
 #include "Forcing.H"
 #include "Utilities.H"
@@ -107,7 +107,8 @@ bcnormal(
   const int sgn,
   const amrex::Real time,
   amrex::GeometryData const& geomdata,
-  ProbParmDevice const& prob_parm)
+  ProbParmDevice const& prob_parm,
+  const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& /*turb_fluc*/)
 {
   const amrex::Real* prob_lo = geomdata.ProbLo();
   const amrex::Real* prob_hi = geomdata.ProbHi();
@@ -210,7 +211,9 @@ init_composition_ammonia(amrex::Real molefrac[NUM_SPECIES]);
 void
 init_composition_air(amrex::Real molefrac[NUM_SPECIES]);
 
-using ProblemTags = EmptyProbTagStruct;
-using ProblemDerives = EmptyProbDeriveStruct;
+using ProblemSpecificFunctions = DefaultProblemSpecificFunctions;
+
+//using ProblemTags = EmptyProbTagStruct;
+//using ProblemDerives = EmptyProbDeriveStruct;
 
 #endif
