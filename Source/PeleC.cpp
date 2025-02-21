@@ -5,11 +5,6 @@
 
 #include <AMReX_Vector.H>
 #include <AMReX_TagBox.H>
-
-#include <AMReX_DataServices.H>
-#include <AMReX_AmrData.H>
-
-
 #include <AMReX_EBMultiFabUtil.H>
 #include <AMReX_EBAmrUtil.H>
 
@@ -613,7 +608,6 @@ PeleC::buildMetrics()
   const auto& ebfactory =
     dynamic_cast<amrex::EBFArrayBoxFactory const&>(Factory());
   amrex::MultiFab::Copy(vfrac, ebfactory.getVolFrac(), 0, 0, 1, numGrow());
-  areafrac = ebfactory.getAreaFrac();
 
   level_mask.clear();
   level_mask.define(grids, dmap, 1, 3);
@@ -727,117 +721,19 @@ PeleC::initData()
     get_new_data(Work_Estimate_Type).setVal(1.0);
   }
 
-  amrex::ParmParse pp("pele");
-  if (pp.countval("pltfile_for_init") > 0) {
-    S_new.setVal(0.0);
-    
-    std::string pltfile;
-    pp.get("pltfile_for_init", pltfile);
-    if (verbose)
-      amrex::Print() << "initData: reading data from: " << pltfile << '\n';
-
-    amrex::DataServices::SetBatchMode();
-    amrex::Amrvis::FileType fileType(amrex::Amrvis::NEWPLT);
-    amrex::DataServices dataServices(pltfile, fileType);
-
-    if (!dataServices.AmrDataOk()) {
-      amrex::DataServices::Dispatch(amrex::DataServices::ExitRequest, NULL);
-    }
-
-    amrex::Vector<std::string> names;
-    pele::physics::eos::speciesNames<pele::physics::PhysicsType::eos_type>(names);
-    //pele::physics::eos::speciesNames(names);
-
-    amrex::AmrData& amrData = dataServices.AmrDataRef();
-    amrex::Vector<std::string> plotnames = amrData.PlotVarNames();
-    int idT = -1, idV = -1, idX = -1, idY = -1, idRho = -1;
-    for (int i = 0; i < plotnames.size(); ++i) {
-      if (plotnames[i] == "Temp")            idT = i;
-      if (plotnames[i] == "density")         idRho = i;
-      if (plotnames[i] == "x_velocity")      idV = i;
-      if (plotnames[i] == "X("+names[0]+")") idX = i;
-      if (plotnames[i] == "Y("+names[0]+")") idY = i;
-     }
-
-//    int idT = 6;
-//    int idRho = 0;
-//    int idV = 1;
-//    int idX = -1;
-//    int idY = 10;
-
-    if (verbose) {
-      amrex::Print() << "Initializing data from pltfile: \"" << pltfile << "\" for level " << level << std::endl;
-      amrex::Print() << "Temp       index: " << idT << std::endl;
-      amrex::Print() << "density    index: " << idRho << std::endl;
-      amrex::Print() << "x_velocity index: " << idV << std::endl;
-    }
-
-    for (int i = 0; i < AMREX_SPACEDIM; i++) {
-       amrData.FillVar(S_new, level, plotnames[idV+i], UMX+i);
-       amrData.FlushGrids(idV+i);
-       amrex::Print() << "Initialized  velocity array " << i << std::endl;
-    }
-
-    if(idT >= 0){
-      amrData.FillVar(S_new, level, "Temp", UTEMP);
-      amrData.FlushGrids(idT);
-    }
-
-    if(idRho >= 0){
-      amrData.FillVar(S_new, level, "density", URHO);
-      amrData.FlushGrids(idRho);
-    }
-
-#ifdef _OPENMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    amrex::MultiFab& S_new = get_new_data(State_Type);
-    for (amrex::MFIter mfi(S_new, amrex::TilingIfNotGPU()); mfi.isValid();
-         ++mfi) {
-      const amrex::Box& box = mfi.tilebox();
-      auto sfab = S_new.array(mfi);
-      const auto geomdata = geom.data();
-      const ProbParmDevice* lprobparm = d_prob_parm_device;
-   
-        amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-     //   problem_post_init(i, j, k, sfab, geomdata);
-        pc_initdata(i, j, k, sfab, geomdata, *lprobparm);
-        pc_check_initial_species(i, j, k, sfab);
+  if (init_pltfile.empty()) {
+    const auto geomdata = geom.data();
+    const ProbParmDevice* lprobparm = d_prob_parm_device;
+    auto sarrs = S_new.arrays();
+    amrex::ParallelFor(
+      S_new, [=] AMREX_GPU_DEVICE(int nbx, int i, int j, int k) noexcept {
+        pc_initdata(i, j, k, sarrs[nbx], geomdata, *lprobparm);
+        // Verify that the sum of (rho Y)_i = rho at every cell
+        pc_check_initial_species(i, j, k, sarrs[nbx]);
       });
-
-    }
-
-  }
-  else {
-
-    if (init_pltfile.empty()) {
-#ifdef _OPENMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-      for (amrex::MFIter mfi(S_new, amrex::TilingIfNotGPU()); mfi.isValid();
-           ++mfi) {
-        const amrex::Box& box = mfi.tilebox();
-        auto sfab = S_new.array(mfi);
-        const auto geomdata = geom.data();
-
-        const ProbParmDevice* lprobparm = d_prob_parm_device;
-
-        amrex::ParallelFor(
-          box, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-            pc_initdata(i, j, k, sfab, geomdata, *lprobparm);
-            // Verify that the sum of (rho Y)_i = rho at every cell
-            pc_check_initial_species(i, j, k, sfab);
-          });
-      }
-    } 
-    // else {
-    //   initLevelDataFromPlt(level, init_pltfile, S_new);
-    // }
-// =======
-//     amrex::Gpu::synchronize();
-//   } else {
-//     initLevelDataFromPlt(level, init_pltfile, S_new);
-// >>>>>>> origin/development
+    amrex::Gpu::synchronize();
+  } else {
+    initLevelDataFromPlt(level, init_pltfile, S_new);
   }
 
   enforce_consistent_e(S_new);
@@ -1447,7 +1343,7 @@ PeleC::post_init(amrex::Real /*stop_time*/)
   }
 
   // Allow the user to define their own post_init functions.
-  // problem_post_init();
+  problem_post_init();
 
 #ifdef PELE_USE_SPRAY
   postInitParticles();
@@ -1757,7 +1653,6 @@ PeleC::errorEst(
       const amrex::Box& tilebox = mfi.tilebox();
       const auto Sfab = S_data.array(mfi);
       auto tag_arr = tags.array(mfi);
-      const auto geomdata = geom.data();
       const auto datbox = amrex::grow(tilebox, 1);
       const auto vfrac_arr = vfrac.array(mfi);
 
@@ -2045,23 +1940,16 @@ PeleC::errorEst(
         static_cast<amrex::Real>(parent->nErrorBuf(ilev)) *
         parent->Geom(tagging_parm->max_eb_refine_lev).CellSize(0) * safetyFac;
     }
-    // Print() << " clearTagDist " <<  clearTagDist << "\n";
 
     // Untag cells too close to EB
-#ifdef _OPENMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    for (amrex::MFIter mfi(tags, amrex::TilingIfNotGPU()); mfi.isValid();
-         ++mfi) {
-      const auto& bx = mfi.tilebox();
-      const auto& dist = signDist.const_array(mfi);
-      auto tag = tags.array(mfi);
-      amrex::ParallelFor(bx, [=] AMREX_GPU_HOST_DEVICE(int i, int j, int k) {
-        if (dist(i, j, k) < clearTagDist) {
-          tag(i, j, k) = amrex::TagBox::CLEAR;
+    const auto& dists = signDist.const_arrays();
+    const auto& tagarrs = tags.arrays();
+    amrex::ParallelFor(
+      tags, [=] AMREX_GPU_DEVICE(int nbx, int i, int j, int k) noexcept {
+        if (dists[nbx](i, j, k) < clearTagDist) {
+          tagarrs[nbx](i, j, k) = amrex::TagBox::CLEAR;
         }
       });
-    }
     amrex::Gpu::synchronize();
   }
 }
@@ -2305,6 +2193,7 @@ PeleC::reset_internal_energy(amrex::MultiFab& S_new, int ng)
     sum0 = volWgtSumMF(S_new, Eden, true);
   }
 #endif
+
   // Ensure (rho e) isn't too small or negative
   {
     const auto captured_allow_small_energy = allow_small_energy;
@@ -2370,23 +2259,15 @@ PeleC::computeTemp(amrex::MultiFab& S, int ng)
     dynamic_cast<amrex::EBFArrayBoxFactory const&>(S.Factory());
   auto const& flags = fact.getMultiEBCellFlagFab();
 
-#ifdef _OPENMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-  for (amrex::MFIter mfi(S, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-    const amrex::Box& bx = mfi.growntilebox(ng);
-
-    const auto& flag_fab = flags[mfi];
-    amrex::FabType typ = flag_fab.getType(bx);
-    if (typ == amrex::FabType::covered) {
-      continue;
-    }
-
-    const auto& sarr = S.array(mfi);
-    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-      pc_cmpTemp(i, j, k, sarr);
+  auto const& sarrs = S.arrays();
+  auto const& flagarrs = flags.const_arrays();
+  const amrex::IntVect ngs(ng);
+  amrex::ParallelFor(
+    S, ngs, [=] AMREX_GPU_DEVICE(int nbx, int i, int j, int k) noexcept {
+      if (!flagarrs[nbx](i, j, k).isCovered()) {
+        pc_cmpTemp(i, j, k, sarrs[nbx]);
+      }
     });
-  }
   amrex::Gpu::synchronize();
 }
 
@@ -2424,7 +2305,6 @@ PeleC::build_fine_mask()
   amrex::BoxArray fba = parent->boxArray(level);
   amrex::iMultiFab ifine_mask = makeFineMask(cba, cdm, fba, crse_ratio, 1, 0);
 
-
   const auto& arrs = fine_mask.arrays();
   const auto& iarrs = ifine_mask.const_arrays();
   amrex::ParallelFor(
@@ -2435,7 +2315,6 @@ PeleC::build_fine_mask()
       arrs[nbx](i, j, k) = iarrs[nbx](i, j, k);
     });
   amrex::Gpu::synchronize();
-
   return fine_mask;
 }
 
@@ -2482,4 +2361,3 @@ PeleC::clean_state(const amrex::MultiFab& /*S*/, amrex::MultiFab& /*S_old*/)
   // In the past, we enforced a minimum density and normalization of species.
   return 0.0;
 }
-

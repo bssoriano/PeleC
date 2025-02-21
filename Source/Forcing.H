@@ -403,5 +403,22 @@ void LTP_ignition_source(
 }
 
 
+// struct ProbParmDevice
+// {
+//   int pmf_N = 0;
+//   int pmf_M = 0;
+//   amrex::Real* d_pmf_X = nullptr;
+//   amrex::Real* d_pmf_Y = nullptr;
+// };
+
+// struct ProbParmHost
+// {
+//   amrex::Vector<amrex::Real> h_pmf_X;
+//   amrex::Vector<amrex::Real> h_pmf_Y;
+//   amrex::Gpu::DeviceVector<amrex::Real> pmf_X;
+//   amrex::Gpu::DeviceVector<amrex::Real> pmf_Y;
+//   ProbParmHost() : pmf_X(0), pmf_Y(0) {}
+// };
+
 #endif
 #endif

@@ -43,12 +43,7 @@ void
 PeleC::fill_ext_source(
   amrex::Real time,
   amrex::Real dt,
-<<<<<<< HEAD
   const amrex::MultiFab& state_old,
-=======
-  const amrex::MultiFab& state_old
-  /*unused*/,
->>>>>>> archive/ltp_model
   const amrex::MultiFab& state_new,
   amrex::MultiFab& ext_src,
   int ng)
@@ -140,6 +135,14 @@ PeleC::fill_ext_source(
       });
   }
 
+  auto const& Sns = state_new.const_arrays();
+  auto const& Farrs = ext_src.arrays();
+  auto const& flagarrs = flags.const_arrays();
+  const amrex::IntVect ngs(ng);
+  amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> ext_force = {0.0};
+  for (int i = 0; i < static_cast<int>(external_forcing.size()); i++) {
+    ext_force[i] = external_forcing[i];
+  }
   amrex::ParallelFor(
     ext_src, ngs, [=] AMREX_GPU_DEVICE(int nbx, int i, int j, int k) noexcept {
       if (!flagarrs[nbx](i, j, k).isCovered()) {
@@ -152,6 +155,7 @@ PeleC::fill_ext_source(
         Farrs[nbx](i, j, k, UEDEN) = e_force;
       }
     });
+
   amrex::Gpu::synchronize();
 
   const ProbParmDevice* lprobparm = PeleC::d_prob_parm_device;
@@ -207,4 +211,89 @@ amrex::Real heavyside(amrex::Real t){
     return x;
   }
 }
+
+// void
+// read_pmf(const std::string& myfile)
+// {
+//   std::string firstline;
+//   std::string secondline;
+//   std::string remaininglines;
+//   unsigned int pos1;
+//   unsigned int pos2;
+//   int variable_count;
+//   int line_count;
+
+//   std::ifstream infile(myfile);
+//   const std::string memfile = read_pmf_file(infile);
+//   infile.close();
+//   std::istringstream iss(memfile);
+
+//   std::getline(iss, firstline);
+//   if (!checkQuotes(firstline)) {
+//     amrex::Abort("PMF file variable quotes unbalanced");
+//   }
+//   std::getline(iss, secondline);
+//   pos1 = 0;
+//   pos2 = 0;
+//   variable_count = 0;
+//   while ((pos1 < firstline.length() - 1) && (pos2 < firstline.length() - 1)) {
+//     pos1 = firstline.find('"', pos1);
+//     pos2 = firstline.find('"', pos1 + 1);
+//     variable_count++;
+//     pos1 = pos2 + 1;
+//   }
+
+//   pos1 = 0;
+//   for (int i = 0; i < variable_count; i++) {
+//     pos1 = firstline.find('"', pos1);
+//     pos2 = firstline.find('"', pos1 + 1);
+//     pos1 = pos2 + 1;
+//   }
+
+//   amrex::Print() << variable_count << " variables found in PMF file"
+//                  << std::endl;
+//   // for (int i = 0; i < variable_count; i++)
+//   //  amrex::Print() << "Variable found: " << pmf_names[i] <<
+//   //  std::endl;
+
+//   line_count = 0;
+//   while (std::getline(iss, remaininglines)) {
+//     line_count++;
+//   }
+//   amrex::Print() << line_count << " data lines found in PMF file" << std::endl;
+
+//   PeleC::h_prob_parm_device->pmf_N = line_count;
+//   PeleC::h_prob_parm_device->pmf_M = variable_count - 1;
+//   PeleC::prob_parm_host->h_pmf_X.resize(PeleC::h_prob_parm_device->pmf_N);
+//   PeleC::prob_parm_host->pmf_X.resize(PeleC::h_prob_parm_device->pmf_N);
+//   PeleC::prob_parm_host->h_pmf_Y.resize(
+//     static_cast<long>(PeleC::h_prob_parm_device->pmf_N) *
+//     PeleC::h_prob_parm_device->pmf_M);
+//   PeleC::prob_parm_host->pmf_Y.resize(
+//     static_cast<long>(PeleC::h_prob_parm_device->pmf_N) *
+//     PeleC::h_prob_parm_device->pmf_M);
+
+//   iss.clear();
+//   iss.seekg(0, std::ios::beg);
+//   std::getline(iss, firstline);
+//   std::getline(iss, secondline);
+//   for (int i = 0; i < PeleC::h_prob_parm_device->pmf_N; i++) {
+//     std::getline(iss, remaininglines);
+//     std::istringstream sinput(remaininglines);
+//     sinput >> PeleC::prob_parm_host->h_pmf_X[i];
+//     for (int j = 0; j < PeleC::h_prob_parm_device->pmf_M; j++) {
+//       sinput >> PeleC::prob_parm_host
+//                   ->h_pmf_Y[j * PeleC::h_prob_parm_device->pmf_N + i];
+//     }
+//   }
+
+//   amrex::Gpu::copy(
+//     amrex::Gpu::hostToDevice, PeleC::prob_parm_host->h_pmf_X.begin(),
+//     PeleC::prob_parm_host->h_pmf_X.end(), PeleC::prob_parm_host->pmf_X.begin());
+//   amrex::Gpu::copy(
+//     amrex::Gpu::hostToDevice, PeleC::prob_parm_host->h_pmf_Y.begin(),
+//     PeleC::prob_parm_host->h_pmf_Y.end(), PeleC::prob_parm_host->pmf_Y.begin());
+//   PeleC::h_prob_parm_device->d_pmf_X = PeleC::prob_parm_host->pmf_X.data();
+//   PeleC::h_prob_parm_device->d_pmf_Y = PeleC::prob_parm_host->pmf_Y.data();
+// }
 #endif
