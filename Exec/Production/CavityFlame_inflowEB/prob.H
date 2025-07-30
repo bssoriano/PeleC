@@ -202,7 +202,7 @@ struct MyProblemSpecificFunctions : public DefaultProblemSpecificFunctions
       const amrex::Real /*ny*/,
       const amrex::Real /*nz*/),
     const amrex::Real ql[5 + NUM_SPECIES],
-    const amrex::Real* /*spl[NUM_SPECIES]*/,
+    const amrex::Real spl[NUM_SPECIES],
     const amrex::Real /*rhoe_l*/,
     const amrex::Real /*gamc_l*/,
     amrex::Real qr[5 + NUM_SPECIES],
@@ -232,7 +232,6 @@ struct MyProblemSpecificFunctions : public DefaultProblemSpecificFunctions
         
         //Normal velocity
         qr[R_UN] =  prob_parm->jet_vel_EB;
-	printf("Jet velocity = %f \n", prob_parm->jet_vel_EB);
   
         qr[R_UT1] = ql[R_UT1];
         qr[R_UT2] = ql[R_UT2];
@@ -245,15 +244,18 @@ struct MyProblemSpecificFunctions : public DefaultProblemSpecificFunctions
         spr[O2_ID] = (1.0 - spr[H2_ID]) * 0.23; // making the rest air
         spr[N2_ID] = 1.0 - spr[H2_ID] - spr[O2_ID];
         
-        amrex::Real p_int = ql[R_P];
+        amrex::Real p_int;
         amrex::Real jet_T = prob_parm->jet_T_EB; 
         amrex::Real rho, eint;
-  
+
+
+	eos.RTY2P(ql[R_RHO], jet_T, spr, p_int);
         eos.PYT2RE(p_int, spr, jet_T, rho, eint);
         eos.TY2G(jet_T, spr, gamc_r);
         
         rhoe_r = rho*eint;
         qr[R_RHO] = rho;
+	qr[R_P] = p_int;
       }
     }
     return do_ebfill;
